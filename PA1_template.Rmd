@@ -8,18 +8,176 @@ output:
 
 ## Loading and preprocessing the data
 
+1. Load the data (i.e. `read.csv()`). Data loaded into R using `unzip` and `read.csv`. 
 
+```{r, echo=TRUE}
+unzip("activity.zip")
+data <- read.csv("activity.csv", header = TRUE, na.strings = "NA")
+```
+
+2. Process/transform the data (if necessary) into a format suitable for your analysis.  
+Date variable is transformed from factor to Date.
+
+```{r, echo=TRUE}
+data$date <- as.Date(data$date)
+```
 
 ## What is mean total number of steps taken per day?
 
+1. Make a histogram of the total number of steps taken each day. `NA` values are to be ignored, histogram showing total number of steps taken per day is shown below.
 
+```{r, echo=TRUE}
+# load reshape2 and ggplot2 packages
+require(reshape2)
+require(ggplot2)
+
+melt_data <- melt(data, id.vars = "date", na.rm = TRUE, measure.vars = "steps")
+
+cast_data <- dcast(melt_data, date ~ variable, sum)
+
+# Plot histogram
+plot(cast_data$date, cast_data$steps, type = "h", main = "Histogram of Total Steps per Day", xlab = "Date", ylab = "Total Steps per Day", col = "red", lwd = 3)
+```
+
+2. Calculate and report the mean and median total number of steps taken per day. `NA` values have been ingnored as stipulated in the assignment.
+
+```{r, echo = TRUE}
+mean_steps <- mean(cast_data$steps, na.rm = TRUE)
+median_steps <- median(cast_data$steps, na.rm = TRUE)
+
+```
+
+The mean number of steps is `r mean_steps`.  
+The median number of steps is `r median_steps`.
 
 ## What is the average daily activity pattern?
 
+1. Show time series plot of the 5 min interval (x-axis) and the average number of steps taken, averaged across all days (y-axis).
+```{r, echo = TRUE}
+Interval_data_melt <- melt(data, id.vars="interval", measure.vars="steps", na.rm=TRUE)
 
+Interval_data_cast <- dcast(Interval_data_melt, interval ~ variable, mean)
+
+# plot with line that shows mean
+plot(Interval_data_cast$interval, Interval_data_cast$steps, type="l", main="Avg Number of Steps Taken at Each Interval", xlab="Interval", ylab="Steps", col="blue")
+abline(h=mean(Interval_data_cast$steps, na.rm=TRUE), col="red")
+```
+
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r, echo=TRUE}
+ 
+max_steps_int <- Interval_data_cast$interval[which(Interval_data_cast$steps == max(Interval_data_cast$steps))]
+
+max_steps <- max(Interval_data_cast$steps)
+
+```
+
+The interval with the highest number of steps is `r max_steps_int`.  
+The maximum number of mean steps is `r max_steps`.  
 
 ## Imputing missing values
+There are a number of days/intervals where there are missing values (coded as `NA`). The presence of missing days may introduce bias into some calculations or summaries of the data.
 
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with `NA`s).  
+```{r, echo = TRUE}
 
+na_count <- sum(is.na(data$steps))
+
+```
+The total number of `NA`s is `r na_count`
+
+2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+The method used will assign the average number of steps for each interval into those intervals with `NA`s.
+
+After this a histogram, mean and median will be created as in section 2.
+
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in.  
+Strategy implemented to fill in `NA` values.
+
+```{r, echo = TRUE}
+# creat new data set without NAs
+Steps_per_int <- Interval_data_cast
+
+data_filled <- data
+
+data_merge = merge(data_filled, Steps_per_int, by="interval", suffixes=c(".b4", ".aftr"))
+
+naIndex = which(is.na(data_filled$steps))
+
+data_filled[naIndex,"steps"] = data_merge[naIndex,"steps.aftr"]
+
+```
+
+4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. 
+
+```{r, echo=TRUE}
+# load reshape2 and ggplot2 packages
+require(reshape2)
+require(ggplot2)
+
+data_filled_melt <- melt(data_filled, id.vars="date", measure.vars="steps")
+
+data_filled_cast <- dcast(data_filled_melt, date ~ variable, sum)
+
+# Plot histogram
+plot(data_filled_cast$date, data_filled_cast$steps, type = "h", main = "Histogram of Total Steps per Day", xlab = "Date", ylab = "Total Steps per Day", col = "red", lwd = 3)
+
+# recalculate mean for data with missing values replaced
+
+mean_steps2 <- mean(data_filled_cast$steps, na.rm = TRUE)
+median_steps2 <- median(data_filled_cast$steps, na.rm = TRUE)
+
+mean_diff <- mean_steps2 - mean_steps
+median_diff <- median_steps2 - median_steps
+
+```
+
+The mean number of steps is `r mean_steps2`.  
+The median number of steps is `r median_steps2`.
+
+Do these values differ from the estimates from the first part of the assignment?
+
+Yes, the values have increased for both mean and meadian.
+
+The mean has increased by `r mean_diff`.  
+The median has incread by `r median_diff`.  
+
+What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r, echo=TRUE}
+
+Interval_datafilled_melt <- melt(data_filled, id.vars="interval", measure.vars="steps")
+
+Interval_datafilled_cast <- dcast(Interval_datafilled_melt, interval ~ variable, mean)
+ 
+max_stepsfilled_int <- Interval_datafilled_cast$interval[which(Interval_datafilled_cast$steps == max(Interval_datafilled_cast$steps))]
+
+max_steps_filled <- max(Interval_datafilled_cast$steps)
+
+max_diff <- max_steps - max_steps_filled
+
+```
+
+The interval with the highest number of steps is `r max_stepsfilled_int`.  
+The maximum number of mean steps is `r max_steps_filled`. 
+
+The maximum number of mean steps has now decreased by `r max_diff`.  
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+For this part the `weekdays()` function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+1. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+```{r, echo=TRUE}
+
+```
+
+
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r, echo=TRUE}
+
+```
